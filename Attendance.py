@@ -4,9 +4,11 @@ import face_recognition
 import os
 from datetime import datetime, timedelta
 
+# Path to the folder containing student images
 path = 'students'
 images = []
 classNames = []
+enrollments = {}
 myList = os.listdir(path)
 print(myList)
 
@@ -16,9 +18,11 @@ for cl in myList:
         print(f"Image {cl} not loaded correctly.")
         continue
     images.append(curImg)
-    classNames.append(os.path.splitext(cl)[0])
-print(classNames)
+    name = os.path.splitext(cl)[0]
+    classNames.append(name)
+    enrollments[name] = 'ENROLLMENT_NUMBER'  # Replace with actual enrollment numbers
 
+print(classNames)
 
 def findEncodings(images):
     encodeList = []
@@ -29,17 +33,21 @@ def findEncodings(images):
             encodeList.append(encode)
     return encodeList
 
-
 def markAttendance(name):
+    now = datetime.now()
+    dateString = now.strftime('%Y-%m-%d')
+    timeString = now.strftime('%H:%M:%S')
+    enrollment = enrollments.get(name, 'Unknown')
+    
+    attendance_record = f'{dateString},{enrollment},{name},{timeString},Present\n'
+    
     with open('Attendance.csv', 'r+') as f:
         myDataList = f.readlines()
-        nameList = [line.split(',')[0] for line in myDataList]
-
-        if name not in nameList:
-            now = datetime.now()
-            dtString = now.strftime('%H:%M:%S')
-            f.writelines(f'\n{name},{dtString}')
-
+        attendance_dates = [line.split(',')[0] for line in myDataList]
+        
+        # Only mark attendance if the student has not been marked present today
+        if dateString not in attendance_dates:
+            f.writelines(attendance_record)
 
 encodeKnown = findEncodings(images)
 print('Encoding Complete')
@@ -59,7 +67,6 @@ while True:
     for encodeFace, faceLoc in zip(encodesInFrame, facesInFrame):
         matches = face_recognition.compare_faces(encodeKnown, encodeFace)
         faceDis = face_recognition.face_distance(encodeKnown, encodeFace)
-        # print(faceDis)
         matchIndex = np.argmin(faceDis)
 
         if matches[matchIndex] and faceDis[matchIndex] < 0.5:
@@ -82,7 +89,7 @@ while True:
             else:
                 recognition_times[name] = now
 
-            # Clean up recognition times to remove outdated entries
+        # Clean up recognition times to remove outdated entries
         current_time = datetime.now()
         recognition_times = {name: time for name, time in recognition_times.items() if
                              current_time - time < timedelta(seconds=3)}
